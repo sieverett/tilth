@@ -43,3 +43,35 @@ class QueryResponse(BaseModel):
     """Response body for POST /query."""
 
     results: list[QueryResult]
+
+
+class SchemaResponse(BaseModel):
+    """Response body for GET /schema."""
+
+    namespaces: list[str]
+    record_fields: dict[str, str]
+    metadata_fields: dict[str, str]
+    filterable_keys: list[str]
+    embed_model: str
+
+
+RECORD_FIELDS: dict[str, str] = {
+    "text": "string — the record content",
+    "source": "string — who wrote it (gateway-set)",
+    "namespace": "string — logical partition",
+    "ts": "float — unix timestamp (gateway-set)",
+    "content_hash": "string — sha256 prefix of scrubbed text (gateway-set)",
+    "request_id": "string — per-request UUID (gateway-set)",
+    "client_ip": "string — caller IP (gateway-set)",
+    "user_agent": "string — caller user-agent (gateway-set)",
+}
+
+METADATA_FIELDS: dict[str, str] = {
+    "severity": "info | warn | error",
+    "env": "prod | staging | dev",
+    "trace_id": "string — correlation ID",
+    "subject_id": "string — entity ID (deal, customer, etc.)",
+    "ttl_days": "integer — retention hint",
+}
+
+FILTERABLE_KEYS: list[str] = ["severity", "env", "subject_id", "trace_id"]

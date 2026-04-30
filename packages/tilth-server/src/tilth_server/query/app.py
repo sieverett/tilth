@@ -15,7 +15,15 @@ from tilth_server._shared.health import create_health_router
 from tilth_server._shared.policy import load_policy
 from tilth_server._shared.rate_limit import TokenBucket
 from tilth_server.query.filters import build_qdrant_filter, escape_closing_tag
-from tilth_server.query.models import QueryRequest, QueryResponse, QueryResult
+from tilth_server.query.models import (
+    FILTERABLE_KEYS,
+    METADATA_FIELDS,
+    RECORD_FIELDS,
+    QueryRequest,
+    QueryResponse,
+    QueryResult,
+    SchemaResponse,
+)
 
 log = logging.getLogger("tilth.query")
 audit_log = logging.getLogger("tilth.audit")
@@ -140,5 +148,20 @@ def create_app(
         )
 
         return QueryResponse(results=results)
+
+    @app.get("/schema", response_model=SchemaResponse)
+    async def schema(request: Request) -> SchemaResponse:
+        """Return the data model, with namespaces scoped to the caller."""
+        header_value = request.headers.get("x-workload-identity")
+        caller = extract_caller_identity(header_value, known_callers)
+        caller_namespaces = sorted(policy.get(caller, set()))
+
+        return SchemaResponse(
+            namespaces=caller_namespaces,
+            record_fields=RECORD_FIELDS,
+            metadata_fields=METADATA_FIELDS,
+            filterable_keys=FILTERABLE_KEYS,
+            embed_model=embed_model,
+        )
 
     return app

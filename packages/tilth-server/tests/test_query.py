@@ -308,3 +308,51 @@ class TestQueryHealth:
     ) -> None:
         resp = await client.get("/metrics")
         assert resp.status_code == 200
+
+
+class TestSchema:
+    async def test_schema_returns_data_model(
+        self, client: AsyncClient
+    ) -> None:
+        resp = await client.get(
+            "/schema",
+            headers={"x-workload-identity": "ops-copilot"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "record_fields" in data
+        assert "metadata_fields" in data
+        assert "filterable_keys" in data
+        assert "embed_model" in data
+        assert data["embed_model"] == "text-embedding-3-small"
+        assert "text" in data["record_fields"]
+        assert "source" in data["record_fields"]
+        assert "severity" in data["metadata_fields"]
+        assert "trace_id" in data["filterable_keys"]
+
+    async def test_schema_namespaces_scoped_to_caller(
+        self, client: AsyncClient
+    ) -> None:
+        # ops-copilot has checkout, support, billing
+        resp1 = await client.get(
+            "/schema",
+            headers={"x-workload-identity": "ops-copilot"},
+        )
+        assert resp1.status_code == 200
+        ns1 = resp1.json()["namespaces"]
+        assert sorted(ns1) == ["billing", "checkout", "support"]
+
+        # support-agent has support, billing only
+        resp2 = await client.get(
+            "/schema",
+            headers={"x-workload-identity": "support-agent"},
+        )
+        assert resp2.status_code == 200
+        ns2 = resp2.json()["namespaces"]
+        assert sorted(ns2) == ["billing", "support"]
+
+    async def test_schema_requires_auth(
+        self, client: AsyncClient
+    ) -> None:
+        resp = await client.get("/schema")
+        assert resp.status_code == 401
