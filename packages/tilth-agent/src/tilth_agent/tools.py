@@ -1,7 +1,5 @@
 """Tool definitions and execution for the reasoning agent."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import logging

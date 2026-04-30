@@ -4,7 +4,6 @@ import os
 from unittest.mock import patch
 
 import pytest
-
 from tilth_server._shared.models import (
     AnthropicLLM,
     AzureEmbeddings,
@@ -15,7 +14,6 @@ from tilth_server._shared.models import (
     create_embedding_client,
     create_llm_client,
 )
-
 
 # --- Embedding tests ---
 

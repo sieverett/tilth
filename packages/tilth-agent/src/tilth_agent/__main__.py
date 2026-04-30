@@ -63,7 +63,7 @@ def main() -> None:
         memory_path=memory_path,
     )
 
-    print(f"Tilth Reasoning Agent")
+    print("Tilth Reasoning Agent")
     print(f"  LLM: {llm.model_name}")
     print(f"  Gateway: {gateway_url}")
     print(f"  Identity: {identity}")
@@ -79,7 +79,7 @@ def main() -> None:
                 user_prompt=user_prompt,
             )
         )
-        print(f"\n--- Run Summary ---")
+        print("\n--- Run Summary ---")
         print(f"  Turns: {stats['turns']}")
         print(f"  Tool calls: {stats['tool_calls']}")
         print(f"  Findings written: {stats['findings_written']}")
