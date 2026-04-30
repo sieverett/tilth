@@ -102,7 +102,8 @@ with a clear error message. To reload policy, restart the service.
 5. Run Presidio scrubber on `body.text`. Replace findings with type tokens
    (e.g., `<EMAIL_ADDRESS>`).
 6. Compute `content_hash`: first 16 hex characters of `sha256(scrubbed_text)`.
-7. Build the payload (see data model in architecture doc):
+7. Generate `request_id` (UUID4).
+8. Build the payload (see data model in architecture doc):
    ```python
    {
      "text": scrubbed_text,
@@ -110,6 +111,9 @@ with a clear error message. To reload policy, restart the service.
      "namespace": body.namespace,
      "ts": time.time(),
      "content_hash": content_hash,
+     "request_id": request_id,
+     "client_ip": request.client.host,
+     "user_agent": request.headers.get("user-agent", ""),
      **body.metadata,
    }
    ```

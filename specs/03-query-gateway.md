@@ -39,6 +39,9 @@ Response (200):
       "namespace": "checkout",
       "ts": 1714435200.0,
       "content_hash": "a9f3c2e1b4d5f678",
+      "request_id": "uuid",
+      "client_ip": "10.0.1.42",
+      "user_agent": "tilth/0.1.0",
       "content": "<retrieved_document source=\"checkout-svc\" ts=\"1714435200.0\">\n...\n</retrieved_document>"
     }
   ]
@@ -130,6 +133,9 @@ but the gateway supports all four for programmatic consumers.
      "namespace": hit.payload["namespace"],
      "ts": hit.payload["ts"],
      "content_hash": hit.payload.get("content_hash"),
+     "request_id": hit.payload.get("request_id"),
+     "client_ip": hit.payload.get("client_ip"),
+     "user_agent": hit.payload.get("user_agent"),
      "content": (
        f'<retrieved_document source="{hit.payload["source"]}" '
        f'ts="{hit.payload["ts"]}">\n'

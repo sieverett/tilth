@@ -112,13 +112,17 @@ Each record stored in Qdrant has:
 | `namespace` | client (validated against policy) | logical partition |
 | `ts` | gateway | unix timestamp of write |
 | `content_hash` | gateway (sha256 of scrubbed text, first 16 hex) | integrity verification |
+| `request_id` | gateway-assigned UUID | per-request tracing |
+| `client_ip` | gateway (from request) | entity fingerprinting |
+| `user_agent` | gateway (from request header) | client version tracking |
 | `severity` | client metadata | optional: info/warn/error |
 | `env` | client metadata | optional: prod/staging/dev |
 | `trace_id` | client metadata | optional: correlation |
 | `subject_id` | client metadata | optional: customer/user/etc. |
 | `ttl_days` | client metadata | optional: retention hint |
 
-`source`, `ts`, and `content_hash` are immutable and gateway-set. Client-
+`source`, `ts`, `content_hash`, `request_id`, `client_ip`, and `user_agent`
+are immutable and gateway-set. Client-
 supplied fields are validated server-side regardless of whether the client
 also validates.
 
