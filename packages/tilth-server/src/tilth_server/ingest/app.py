@@ -69,6 +69,27 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        # Create collection if it doesn't exist
+        if not skip_collection_check:
+            try:
+                from qdrant_client.models import Distance, VectorParams
+
+                if not await qdrant_client.collection_exists(collection_name):
+                    await qdrant_client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=VectorParams(
+                            size=embedding_client.dimension,
+                            distance=Distance.COSINE,
+                        ),
+                    )
+                    log.info(
+                        "Created Qdrant collection %s (dim=%d)",
+                        collection_name,
+                        embedding_client.dimension,
+                    )
+            except Exception:
+                log.exception("Failed to initialize Qdrant collection")
+
         writer.start()
         yield
         await writer.stop(timeout=5.0)

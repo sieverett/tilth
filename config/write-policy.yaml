@@ -2,6 +2,9 @@ test-writer:
   - checkout
   - support
   - billing
+  - sales
+  - analysis
+  - agent-tasks
 checkout-svc:
   - checkout
 support-bot:

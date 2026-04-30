@@ -93,13 +93,14 @@ def create_app(
         query_vector = vectors[0]
 
         # Search Qdrant
-        hits = await qdrant_client.search(
+        search_result = await qdrant_client.query_points(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=qfilter,
             limit=body.top_k,
             with_payload=True,
         )
+        hits = search_result.points
 
         # Build results
         results: list[QueryResult] = []

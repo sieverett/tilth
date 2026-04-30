@@ -2,6 +2,9 @@ ops-copilot:
   - checkout
   - support
   - billing
+  - sales
+  - analysis
+  - agent-tasks
 support-agent:
   - support
   - billing
