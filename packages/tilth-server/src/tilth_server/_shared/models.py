@@ -228,6 +228,59 @@ class OpenAILLM:
         self._client = AsyncOpenAI()
         self._model = model
 
+    @staticmethod
+    def _convert_messages(
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Convert Anthropic-format messages to OpenAI format."""
+        converted: list[dict[str, Any]] = []
+        for msg in messages:
+            role = msg["role"]
+            content = msg.get("content")
+
+            # Assistant messages with tool_use content blocks
+            if role == "assistant" and isinstance(content, list):
+                text_parts = [
+                    b["text"] for b in content if b.get("type") == "text"
+                ]
+                tool_calls = [
+                    {
+                        "id": b["id"],
+                        "type": "function",
+                        "function": {
+                            "name": b["name"],
+                            "arguments": json.dumps(b.get("input", {})),
+                        },
+                    }
+                    for b in content
+                    if b.get("type") == "tool_use"
+                ]
+                oai_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": "\n".join(text_parts) if text_parts else None,
+                }
+                if tool_calls:
+                    oai_msg["tool_calls"] = tool_calls
+                converted.append(oai_msg)
+
+            # User messages with tool_result content blocks
+            elif role == "user" and isinstance(content, list):
+                for block in content:
+                    if block.get("type") == "tool_result":
+                        converted.append({
+                            "role": "tool",
+                            "tool_call_id": block["tool_use_id"],
+                            "content": block.get("content", ""),
+                        })
+                    else:
+                        converted.append({"role": "user", "content": str(block)})
+
+            # Normal messages
+            else:
+                converted.append(msg)
+
+        return converted
+
     async def complete(
         self,
         messages: list[dict[str, Any]],
@@ -236,14 +289,14 @@ class OpenAILLM:
         tools: list[dict[str, Any]] | None = None,
         max_tokens: int = 4096,
     ) -> LLMResponse:
-        oai_messages = list(messages)
+        oai_messages = self._convert_messages(messages)
         if system is not None:
             oai_messages.insert(0, {"role": "system", "content": system})
 
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": oai_messages,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_tokens,
         }
         if tools is not None:
             kwargs["tools"] = [

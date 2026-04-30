@@ -6,6 +6,10 @@ requires-python = ">=3.11"
 [tool.uv.workspace]
 members = ["packages/*"]
 
+[tool.uv.sources]
+tilth = { workspace = true }
+tilth-server = { workspace = true }
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
