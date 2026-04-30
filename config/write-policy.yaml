@@ -1,0 +1,14 @@
+test-writer:
+  - checkout
+  - support
+  - billing
+checkout-svc:
+  - checkout
+support-bot:
+  - support
+billing-job:
+  - billing
+ops-shared:
+  - checkout
+  - support
+  - billing

@@ -1,0 +1,42 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+
+  ingest-gateway:
+    build:
+      context: packages/tilth-server
+    command: uvicorn tilth_server.ingest.app:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COLLECTION_NAME=tilth
+      - EMBED_MODEL=text-embedding-3-small
+      - WRITE_POLICY_PATH=/etc/tilth/write-policy.yaml
+    volumes:
+      - ./config/write-policy.yaml:/etc/tilth/write-policy.yaml:ro
+    depends_on:
+      - qdrant
+
+  query-gateway:
+    build:
+      context: packages/tilth-server
+    command: uvicorn tilth_server.query.app:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COLLECTION_NAME=tilth
+      - EMBED_MODEL=text-embedding-3-small
+      - READ_POLICY_PATH=/etc/tilth/read-policy.yaml
+    volumes:
+      - ./config/read-policy.yaml:/etc/tilth/read-policy.yaml:ro
+    depends_on:
+      - qdrant

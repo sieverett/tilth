@@ -1,0 +1,13 @@
+ops-copilot:
+  - checkout
+  - support
+  - billing
+support-agent:
+  - support
+  - billing
+billing-only-reader:
+  - billing
+dev-stdio-user:
+  - checkout
+  - support
+  - billing
