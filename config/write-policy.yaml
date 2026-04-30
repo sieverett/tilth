@@ -5,6 +5,9 @@ test-writer:
   - sales
   - analysis
   - agent-tasks
+ops-copilot:
+  - analysis
+  - agent-tasks
 checkout-svc:
   - checkout
 support-bot:
