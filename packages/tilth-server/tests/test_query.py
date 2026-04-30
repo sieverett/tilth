@@ -69,14 +69,11 @@ def mock_qdrant() -> AsyncMock:
 
 
 @pytest.fixture()
-def mock_openai() -> AsyncMock:
-    client = AsyncMock()
-    embedding = MagicMock()
-    embedding.embedding = [0.1] * 1536
-    resp = MagicMock()
-    resp.data = [embedding]
-    client.embeddings = MagicMock()
-    client.embeddings.create = AsyncMock(return_value=resp)
+def mock_embedding() -> MagicMock:
+    client = MagicMock()
+    client.embed = AsyncMock(return_value=[[0.1] * 1536])
+    client.model_name = "text-embedding-3-small"
+    client.dimension = 1536
     return client
 
 
@@ -84,14 +81,13 @@ def mock_openai() -> AsyncMock:
 async def client(
     policy_file: str,
     mock_qdrant: AsyncMock,
-    mock_openai: AsyncMock,
+    mock_embedding: AsyncMock,
 ) -> AsyncClient:
     app = create_app(
         policy_path=policy_file,
         qdrant_client=mock_qdrant,
-        openai_client=mock_openai,
+        embedding_client=mock_embedding,
         collection_name="tilth-test",
-        embed_model="text-embedding-3-small",
     )
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -140,15 +136,14 @@ class TestQueryNamespace:
         self,
         policy_file: str,
         mock_qdrant: AsyncMock,
-        mock_openai: AsyncMock,
+        mock_embedding: AsyncMock,
     ) -> None:
         app = create_app(
             policy_path=policy_file,
             qdrant_client=mock_qdrant,
-            openai_client=mock_openai,
+            embedding_client=mock_embedding,
             collection_name="tilth-test",
-            embed_model="text-embedding-3-small",
-        )
+            )
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
@@ -209,7 +204,7 @@ class TestQueryResults:
     async def test_closing_tag_escaped_in_response(
         self,
         policy_file: str,
-        mock_openai: AsyncMock,
+        mock_embedding: AsyncMock,
     ) -> None:
         mock_qdrant = AsyncMock()
         poisoned_hit = _make_mock_hit(
@@ -220,10 +215,9 @@ class TestQueryResults:
         app = create_app(
             policy_path=policy_file,
             qdrant_client=mock_qdrant,
-            openai_client=mock_openai,
+            embedding_client=mock_embedding,
             collection_name="tilth-test",
-            embed_model="text-embedding-3-small",
-        )
+            )
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:

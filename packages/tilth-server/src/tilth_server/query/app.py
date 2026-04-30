@@ -32,9 +32,8 @@ audit_log = logging.getLogger("tilth.audit")
 def create_app(
     policy_path: str,
     qdrant_client: Any,
-    openai_client: Any,
+    embedding_client: Any,
     collection_name: str = "tilth",
-    embed_model: str = "text-embedding-3-small",
     max_top_k: int = 20,
     max_query_bytes: int = 4096,
 ) -> FastAPI:
@@ -43,9 +42,8 @@ def create_app(
     Args:
         policy_path: path to read-policy.yaml.
         qdrant_client: AsyncQdrantClient instance.
-        openai_client: AsyncOpenAI instance.
+        embedding_client: EmbeddingClient instance (from models.py).
         collection_name: Qdrant collection name.
-        embed_model: embedding model name (must match ingest gateway).
         max_top_k: maximum top_k value.
         max_query_bytes: maximum query size in bytes.
     """
@@ -91,10 +89,8 @@ def create_app(
         qfilter = build_qdrant_filter(effective, body.filters)
 
         # Embed query
-        embed_resp = await openai_client.embeddings.create(
-            model=embed_model, input=body.query
-        )
-        query_vector = embed_resp.data[0].embedding
+        vectors = await embedding_client.embed([body.query])
+        query_vector = vectors[0]
 
         # Search Qdrant
         hits = await qdrant_client.search(
@@ -161,7 +157,7 @@ def create_app(
             record_fields=RECORD_FIELDS,
             metadata_fields=METADATA_FIELDS,
             filterable_keys=FILTERABLE_KEYS,
-            embed_model=embed_model,
+            embed_model=embedding_client.model_name,
         )
 
     return app

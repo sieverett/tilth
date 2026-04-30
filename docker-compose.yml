@@ -8,15 +8,20 @@ services:
   ingest-gateway:
     build:
       context: packages/tilth-server
-    command: uvicorn tilth_server.ingest.app:app --host 0.0.0.0 --port 8001
+    command: python -m tilth_server.ingest
     ports:
       - "8001:8001"
     environment:
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_API_KEY=test
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COLLECTION_NAME=tilth
-      - EMBED_MODEL=text-embedding-3-small
+      - EMBED_PROVIDER=${EMBED_PROVIDER:-azure}
+      - EMBED_MODEL=${EMBED_MODEL:-text-embedding-3-small}
+      - EMBED_DIM=${EMBED_DIM:-1536}
+      - AZURE_API_KEY=${AZURE_API_KEY}
+      - AZURE_API_BASE=${AZURE_API_BASE}
+      - AZURE_API_VERSION=${AZURE_API_VERSION:-2024-02-01}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - WRITE_POLICY_PATH=/etc/tilth/write-policy.yaml
     volumes:
       - ./config/write-policy.yaml:/etc/tilth/write-policy.yaml:ro
@@ -26,15 +31,20 @@ services:
   query-gateway:
     build:
       context: packages/tilth-server
-    command: uvicorn tilth_server.query.app:app --host 0.0.0.0 --port 8002
+    command: python -m tilth_server.query
     ports:
       - "8002:8002"
     environment:
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_API_KEY=test
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COLLECTION_NAME=tilth
-      - EMBED_MODEL=text-embedding-3-small
+      - EMBED_PROVIDER=${EMBED_PROVIDER:-azure}
+      - EMBED_MODEL=${EMBED_MODEL:-text-embedding-3-small}
+      - EMBED_DIM=${EMBED_DIM:-1536}
+      - AZURE_API_KEY=${AZURE_API_KEY}
+      - AZURE_API_BASE=${AZURE_API_BASE}
+      - AZURE_API_VERSION=${AZURE_API_VERSION:-2024-02-01}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - READ_POLICY_PATH=/etc/tilth/read-policy.yaml
     volumes:
       - ./config/read-policy.yaml:/etc/tilth/read-policy.yaml:ro

@@ -35,18 +35,16 @@ class BatchWriter:
     def __init__(
         self,
         qdrant: Any,
-        openai: Any,
+        embedding_client: Any,
         collection_name: str,
-        embed_model: str,
         batch_size: int = 64,
         batch_window_ms: int = 200,
         queue_max: int = 10_000,
     ) -> None:
         self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=queue_max)
         self.qdrant = qdrant
-        self.openai = openai
+        self.embedding_client = embedding_client
         self.collection_name = collection_name
-        self.embed_model = embed_model
         self.batch_size = batch_size
         self.batch_window_ms = batch_window_ms
         self._task: asyncio.Task[None] | None = None
@@ -118,18 +116,16 @@ class BatchWriter:
         texts = [item["text"] for item in batch]
 
         start = time.monotonic()
-        resp = await self.openai.embeddings.create(
-            model=self.embed_model, input=texts
-        )
+        vectors = await self.embedding_client.embed(texts)
         EMBED_LATENCY.observe(time.monotonic() - start)
 
         points = [
             PointStruct(
                 id=item["id"],
-                vector=emb.embedding,
+                vector=vec,
                 payload=item["payload"],
             )
-            for item, emb in zip(batch, resp.data, strict=True)
+            for item, vec in zip(batch, vectors, strict=True)
         ]
 
         start = time.monotonic()

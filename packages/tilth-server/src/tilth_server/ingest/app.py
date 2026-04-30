@@ -25,12 +25,10 @@ log = logging.getLogger("tilth.ingest")
 def create_app(
     policy_path: str,
     qdrant_client: Any,
-    openai_client: Any,
+    embedding_client: Any,
     analyzer: Any,
     anonymizer: Any,
     collection_name: str = "tilth",
-    embed_model: str = "text-embedding-3-small",
-    embed_dim: int = 1536,
     batch_size: int = 64,
     batch_window_ms: int = 200,
     batch_queue_max: int = 10_000,
@@ -43,12 +41,10 @@ def create_app(
     Args:
         policy_path: path to write-policy.yaml.
         qdrant_client: AsyncQdrantClient instance.
-        openai_client: AsyncOpenAI instance.
+        embedding_client: EmbeddingClient instance (from models.py).
         analyzer: Presidio AnalyzerEngine instance.
         anonymizer: Presidio AnonymizerEngine instance.
         collection_name: Qdrant collection name.
-        embed_model: embedding model name.
-        embed_dim: embedding vector dimension.
         batch_size: max items per embedding call.
         batch_window_ms: max wait before flushing partial batch.
         batch_queue_max: max items in batch writer queue.
@@ -64,9 +60,8 @@ def create_app(
 
     writer = BatchWriter(
         qdrant=qdrant_client,
-        openai=openai_client,
+        embedding_client=embedding_client,
         collection_name=collection_name,
-        embed_model=embed_model,
         batch_size=batch_size,
         batch_window_ms=batch_window_ms,
         queue_max=batch_queue_max,

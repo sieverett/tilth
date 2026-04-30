@@ -51,8 +51,11 @@ def mock_qdrant() -> AsyncMock:
 
 
 @pytest.fixture()
-def mock_openai() -> AsyncMock:
-    client = AsyncMock()
+def mock_embedding() -> MagicMock:
+    client = MagicMock()
+    client.embed = AsyncMock(return_value=[[0.1] * 1536])
+    client.model_name = "text-embedding-3-small"
+    client.dimension = 1536
     return client
 
 
@@ -72,19 +75,17 @@ def mock_anonymizer() -> MagicMock:
 async def client(
     policy_file: str,
     mock_qdrant: AsyncMock,
-    mock_openai: AsyncMock,
+    mock_embedding: AsyncMock,
     mock_analyzer: MagicMock,
     mock_anonymizer: MagicMock,
 ) -> AsyncClient:
     app = create_app(
         policy_path=policy_file,
         qdrant_client=mock_qdrant,
-        openai_client=mock_openai,
+        embedding_client=mock_embedding,
         analyzer=mock_analyzer,
         anonymizer=mock_anonymizer,
         collection_name="tilth-test",
-        embed_model="text-embedding-3-small",
-        embed_dim=1536,
         batch_size=64,
         batch_window_ms=200,
         batch_queue_max=10_000,
@@ -162,7 +163,7 @@ class TestIngestBehavior:
         self,
         policy_file: str,
         mock_qdrant: AsyncMock,
-        mock_openai: AsyncMock,
+        mock_embedding: AsyncMock,
         mock_anonymizer: MagicMock,
     ) -> None:
         """Email in text is replaced with Presidio token before queueing."""
@@ -180,12 +181,10 @@ class TestIngestBehavior:
         app = create_app(
             policy_path=policy_file,
             qdrant_client=mock_qdrant,
-            openai_client=mock_openai,
+            embedding_client=mock_embedding,
             analyzer=mock_analyzer,
             anonymizer=mock_anonymizer,
             collection_name="tilth-test",
-            embed_model="text-embedding-3-small",
-            embed_dim=1536,
             skip_collection_check=True,
         )
         async with AsyncClient(
@@ -222,7 +221,7 @@ class TestIngestBehavior:
         self,
         policy_file: str,
         mock_qdrant: AsyncMock,
-        mock_openai: AsyncMock,
+        mock_embedding: AsyncMock,
         mock_anonymizer: MagicMock,
     ) -> None:
         mock_analyzer = MagicMock()
@@ -233,12 +232,10 @@ class TestIngestBehavior:
         app = create_app(
             policy_path=policy_file,
             qdrant_client=mock_qdrant,
-            openai_client=mock_openai,
+            embedding_client=mock_embedding,
             analyzer=mock_analyzer,
             anonymizer=mock_anonymizer,
             collection_name="tilth-test",
-            embed_model="text-embedding-3-small",
-            embed_dim=1536,
             skip_collection_check=True,
             _capture_queue=submitted_items,
         )
@@ -260,7 +257,7 @@ class TestIngestBehavior:
         self,
         policy_file: str,
         mock_qdrant: AsyncMock,
-        mock_openai: AsyncMock,
+        mock_embedding: AsyncMock,
         mock_anonymizer: MagicMock,
     ) -> None:
         mock_analyzer = MagicMock()
@@ -269,12 +266,10 @@ class TestIngestBehavior:
         app = create_app(
             policy_path=policy_file,
             qdrant_client=mock_qdrant,
-            openai_client=mock_openai,
+            embedding_client=mock_embedding,
             analyzer=mock_analyzer,
             anonymizer=mock_anonymizer,
             collection_name="tilth-test",
-            embed_model="text-embedding-3-small",
-            embed_dim=1536,
             batch_queue_max=1,  # tiny queue
             skip_collection_check=True,
         )

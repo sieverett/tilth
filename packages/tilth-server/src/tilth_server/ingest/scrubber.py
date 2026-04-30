@@ -1,5 +1,7 @@
 """Presidio PII scrubbing."""
 
+from __future__ import annotations
+
 from typing import Any
 
 PII_ENTITIES = [
@@ -35,3 +37,20 @@ def scrub_text(
     if not findings:
         return text
     return anonymizer.anonymize(text=text, analyzer_results=findings).text
+
+
+def create_analyzer() -> Any:
+    """Create and warm a Presidio AnalyzerEngine."""
+    from presidio_analyzer import AnalyzerEngine
+
+    engine = AnalyzerEngine()
+    # Warm the spaCy model
+    engine.analyze(text="warm up", entities=PII_ENTITIES, language="en")
+    return engine
+
+
+def create_anonymizer() -> Any:
+    """Create a Presidio AnonymizerEngine."""
+    from presidio_anonymizer import AnonymizerEngine
+
+    return AnonymizerEngine()
