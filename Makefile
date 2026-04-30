@@ -10,9 +10,9 @@ typecheck:
 	uv run mypy --strict packages/tilth/src packages/tilth-server/src packages/tilth-mcp/src
 
 test:
-	uv run pytest packages/tilth/tests -v
-	uv run pytest packages/tilth-server/tests -v
-	uv run pytest packages/tilth-mcp/tests -v
+	uv run python -m pytest packages/tilth/tests -v
+	uv run python -m pytest packages/tilth-server/tests -v
+	uv run python -m pytest packages/tilth-mcp/tests -v
 
 up:
 	docker compose up -d --build
