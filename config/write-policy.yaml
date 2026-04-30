@@ -1,0 +1,20 @@
+test-writer:
+  - checkout
+  - support
+  - billing
+  - sales
+  - analysis
+  - agent-tasks
+ops-copilot:
+  - analysis
+  - agent-tasks
+checkout-svc:
+  - checkout
+support-bot:
+  - support
+billing-job:
+  - billing
+ops-shared:
+  - checkout
+  - support
+  - billing

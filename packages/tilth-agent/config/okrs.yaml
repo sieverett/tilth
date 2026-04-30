@@ -1,0 +1,13 @@
+goals:
+  - name: Q2 Revenue
+    target: "$2.4M closed"
+    current: "$680K closed, $833K active pipeline"
+    period: "Q2 2026"
+
+  - name: Pipeline Velocity
+    target: "28-day average cycle"
+    current: "unknown"
+
+  - name: Win Rate
+    target: "35%"
+    current: "unknown"

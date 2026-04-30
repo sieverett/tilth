@@ -39,6 +39,9 @@ Response (200):
       "namespace": "checkout",
       "ts": 1714435200.0,
       "content_hash": "a9f3c2e1b4d5f678",
+      "request_id": "uuid",
+      "client_ip": "10.0.1.42",
+      "user_agent": "tilth/0.1.0",
       "content": "<retrieved_document source=\"checkout-svc\" ts=\"1714435200.0\">\n...\n</retrieved_document>"
     }
   ]
@@ -50,6 +53,40 @@ Errors:
   400 — invalid body (size, schema, disallowed filter key)
   429 — rate limited
 ```
+
+### Schema
+
+```
+GET /schema
+{
+  "namespaces": ["checkout", "support", "billing"],
+  "record_fields": {
+    "text": "string — the record content",
+    "source": "string — who wrote it (gateway-set)",
+    "namespace": "string — logical partition",
+    "ts": "float — unix timestamp (gateway-set)",
+    "content_hash": "string — sha256 prefix of scrubbed text (gateway-set)",
+    "request_id": "string — per-request UUID (gateway-set)",
+    "client_ip": "string — caller IP (gateway-set)",
+    "user_agent": "string — caller user-agent (gateway-set)"
+  },
+  "metadata_fields": {
+    "severity": "info | warn | error",
+    "env": "prod | staging | dev",
+    "trace_id": "string — correlation ID",
+    "subject_id": "string — entity ID (deal, customer, etc.)",
+    "ttl_days": "integer — retention hint"
+  },
+  "filterable_keys": ["severity", "env", "subject_id", "trace_id"],
+  "embed_model": "text-embedding-3-small"
+}
+```
+
+Generated from the gateway's own validation code and read-policy. The
+`namespaces` list reflects the caller's authorized namespaces (derived
+from the `x-workload-identity` header and the read-policy). No auth
+required — the schema is not sensitive, but namespace visibility is
+scoped to the caller.
 
 ### Health and metrics
 
@@ -130,6 +167,9 @@ but the gateway supports all four for programmatic consumers.
      "namespace": hit.payload["namespace"],
      "ts": hit.payload["ts"],
      "content_hash": hit.payload.get("content_hash"),
+     "request_id": hit.payload.get("request_id"),
+     "client_ip": hit.payload.get("client_ip"),
+     "user_agent": hit.payload.get("user_agent"),
      "content": (
        f'<retrieved_document source="{hit.payload["source"]}" '
        f'ts="{hit.payload["ts"]}">\n'
@@ -204,6 +244,11 @@ potential injection vector. Replace any occurrences with
       even when it's the most semantically similar match).
 - [ ] An integration test asserts every result has a `<retrieved_document>`
       wrapper with `source` and `ts` attributes.
+- [ ] `GET /schema` returns the data model with namespaces scoped to the
+      caller's read-policy permissions.
+- [ ] A test asserts `/schema` includes `record_fields`, `metadata_fields`,
+      `filterable_keys`, and `embed_model`.
+- [ ] A test asserts `/schema` namespaces differ per caller identity.
 
 ## Out of scope
 

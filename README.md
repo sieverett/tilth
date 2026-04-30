@@ -7,10 +7,10 @@ Drop `tilth` into any service. Send text. Agents and tools retrieve it by
 meaning. You don't manage credentials, embeddings, or vector stores.
 
 ```python
-from tilth import send
+import tilth
 
-send("Stripe returned card_declined for user 42",
-     namespace="checkout", severity="warn")
+tilth.send("Stripe returned card_declined for user 42",
+           namespace="checkout", severity="warn")
 ```
 
 ---
@@ -38,7 +38,7 @@ Tilth ships as three independently installable PyPI packages:
 
 | Package | Install | Purpose |
 |---|---|---|
-| `tilth` | `pip install tilth` | Client library. Fire-and-forget `send()`. |
+| `tilth` | `pip install tilth` | Client library. Fire-and-forget `tilth.send()`. |
 | `tilth-server` | `pip install tilth-server` | Ingest + query gateways. |
 | `tilth-mcp` | `pip install tilth-mcp` | MCP server for AI agents. |
 
@@ -63,12 +63,12 @@ TILTH_IDENTITY=your-service-name
 ```
 
 ```python
-from tilth import send
+import tilth
 
-send("Customer requested refund for order #8821, cited shipping delay",
-     namespace="support",
-     severity="info",
-     subject_id="cust_8821")
+tilth.send("Customer requested refund for order #8821, cited shipping delay",
+           namespace="support",
+           severity="info",
+           subject_id="cust_8821")
 ```
 
 `send()` is fire-and-forget. It returns immediately, queues the record in the
@@ -93,7 +93,7 @@ make e2e       # runs end-to-end tests
 
 ## Usage
 
-### `send(text, *, namespace, **metadata)`
+### `tilth.send(text, *, namespace, **metadata)`
 
 - `text` (str, required) — the content. Up to 32 KB.
 - `namespace` (str, required) — which namespace to write to. Your service is
@@ -101,21 +101,21 @@ make e2e       # runs end-to-end tests
 - `**metadata` — optional structured fields. Allowed keys: `env`, `severity`,
   `trace_id`, `subject_id`, `ttl_days`. Other keys cause a drop.
 
-### `asend(text, *, namespace, **metadata)`
+### `tilth.asend(text, *, namespace, **metadata)`
 
-Async wrapper. Equivalent to `send()` — the queue submission is fast and
+Async wrapper. Equivalent to `tilth.send()` — the queue submission is fast and
 there's nothing to actually await. Exists so it composes with `asyncio.gather`.
 
 ### `VectorHandler(namespace, *, extra_metadata=None)`
 
-`logging.Handler` subclass. `emit()` calls `send()`. Use sparingly — most
-log lines are noise for semantic search.
+`logging.Handler` subclass. `emit()` calls `tilth.send()`. Use sparingly —
+most log lines are noise for semantic search.
 
 ```python
 import logging
-from tilth import VectorHandler
+import tilth
 
-handler = VectorHandler(namespace="checkout")
+handler = tilth.VectorHandler(namespace="checkout")
 handler.setLevel(logging.WARNING)
 logging.getLogger().addHandler(handler)
 ```
@@ -145,7 +145,7 @@ deterministic.
 | `TILTH_IDENTITY` | unset | Workload identity sent as `x-workload-identity`. |
 | `TILTH_QUEUE_SIZE` | `10000` | Max in-memory buffer before drop. |
 | `TILTH_TIMEOUT_S` | `5.0` | Per-request HTTP timeout to the gateway. |
-| `TILTH_DISABLE` | unset | Set to `1` to no-op all `send()` calls. |
+| `TILTH_DISABLE` | unset | Set to `1` to no-op all `tilth.send()` calls. |
 
 ---
 
@@ -176,7 +176,7 @@ If you need guaranteed delivery, you're using the wrong tool.
 See [architecture.md](./docs/architecture.md) for the full system design.
 
 ```
-services ──send()──▶ ingest gateway ──▶ Qdrant ◀── query gateway ◀── MCP server ◀── agents
+services ──tilth.send()──▶ ingest gateway ──▶ Qdrant ◀── query gateway ◀── MCP server ◀── agents
 ```
 
 Three services, one vector store, one client library. Credentials don't sprawl.
