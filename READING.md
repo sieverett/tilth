@@ -211,7 +211,10 @@ If you discover something in memory that shouldn't be there — a leaked
 secret, PII that escaped scrubbing, poisoned content — take immediate
 action:
 
-1. Delete the record by ID via the Qdrant admin API.
+1. Delete the record by ID via the gateway API (`DELETE /records/{id}`).
+   This endpoint requires admin credentials (JWT with `admin` role in prod
+   mode). Delete and update are **not** available through the MCP server —
+   they are admin-only operations via the gateway HTTP API.
 2. Create an audit entry with reason and approver.
 3. Investigate whether it indicates a scrubbing gap.
 

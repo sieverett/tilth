@@ -227,6 +227,23 @@ If you need guaranteed delivery, you're using the wrong tool.
 
 ---
 
+## Security
+
+Tilth supports two authentication modes, controlled by `TILTH_AUTH_MODE`:
+
+- **`dev`** (default) — trusts the `x-workload-identity` header. No token
+  validation. Suitable for local development and docker-compose.
+- **`prod`** — validates a JWT from the `Authorization: Bearer` header. The
+  JWT subject claim becomes the caller identity; the roles claim gates admin
+  access. Requires `TILTH_JWT_SECRET` and optionally `TILTH_JWT_ALGORITHM`
+  (default `HS256`).
+
+**Admin-only operations:** `DELETE /records/{id}` and `PATCH /records/{id}`
+require the `admin` role in prod mode. In dev mode, all callers can
+delete and update.
+
+---
+
 ## Architecture
 
 See [architecture.md](./docs/architecture.md) for the full system design.

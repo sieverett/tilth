@@ -108,6 +108,9 @@ GET /metrics       → prometheus format
 | `MAX_QUERY_BYTES` | `4096` | |
 | `READ_POLICY_PATH` | `/etc/tilth/read-policy.yaml` | |
 | `STORES_CONFIG_PATH` | `/etc/tilth/stores.yaml` | YAML file mapping namespaces to Qdrant collections via store_router. When caller's namespaces span multiple collections, the gateway fans out queries across stores. |
+| `TILTH_AUTH_MODE` | `dev` | `dev` trusts `x-workload-identity` header. `prod` validates JWT from `Authorization: Bearer` header. |
+| `TILTH_JWT_SECRET` | *(required in prod)* | JWT signing secret. Only used when `TILTH_AUTH_MODE=prod`. |
+| `TILTH_JWT_ALGORITHM` | `HS256` | JWT signing algorithm. Only used when `TILTH_AUTH_MODE=prod`. |
 
 ### Read policy file format
 
@@ -139,7 +142,12 @@ but the gateway supports all four for programmatic consumers.
 
 ### Per-request handling
 
-1. Read `x-workload-identity`. Missing → 401. Unknown to read policy → 401.
+1. Resolve caller identity. In dev mode: read `x-workload-identity` header.
+   In prod mode: validate JWT from `Authorization: Bearer` header; use the
+   subject claim as caller identity. Missing or invalid → 401. Unknown to
+   read policy → 401. Mutation endpoints (`DELETE /records/{id}`,
+   `PATCH /records/{id}`) require the `admin` role in the JWT claims (prod
+   mode only; dev mode allows all callers).
 2. Validate body against pydantic schema. Failure → 400.
 3. Compute effective namespaces:
    - If `body.namespaces is None`: use all permitted for this caller.

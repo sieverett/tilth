@@ -121,6 +121,22 @@ false negatives are a direct data exposure path.
 here." This is documented in the README. Embedding inversion is not a
 practical v1 concern but should be revisited if the store holds regulated data.
 
+### T9: Unauthorized record mutation
+
+**Risk:** An attacker or unprivileged service deletes or modifies records
+to cover tracks or poison the store.
+
+**Mitigation:**
+- In prod mode (`TILTH_AUTH_MODE=prod`), `DELETE /records/{id}` and
+  `PATCH /records/{id}` require the `admin` role in the JWT claims.
+- The MCP server does not expose delete or update tools. Agents are
+  read/write only; mutations go through the gateway API with admin
+  credentials.
+- In dev mode, all callers can mutate (acceptable for local development).
+
+**Residual risk:** Admin credential compromise. Audit logs are the
+detective control.
+
 ## Out of scope (for v1)
 
 - **Insider threats from platform team members.** People with gateway access
@@ -135,8 +151,10 @@ practical v1 concern but should be revisited if the store holds regulated data.
 ## Principles
 
 1. **Identity comes from the transport, not the body.** Anything the client
-   says about itself is a claim, not a fact. Verified identity comes from
-   mTLS, OAuth, or workload identity.
+   says about itself is a claim, not a fact. In dev mode, identity comes
+   from the `x-workload-identity` header (trusted, no validation). In prod
+   mode (`TILTH_AUTH_MODE=prod`), identity is extracted from a validated JWT
+   subject claim, and mutations require the `admin` role.
 
 2. **Allowlists over blocklists.** Metadata keys, filter keys, namespaces —
    all enumerate what's permitted. Adding a key requires a code change.
