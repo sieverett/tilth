@@ -54,12 +54,21 @@ def load_store_config(path: str) -> list[StoreConfig]:
 class StoreRouter:
     """Routes namespaces to Qdrant collections."""
 
-    def __init__(self, stores: list[StoreConfig]) -> None:
+    def __init__(
+        self, stores: list[StoreConfig], default_store: str = "default"
+    ) -> None:
         self._stores = stores
+        self._default_store = default_store
         self._ns_to_collection: dict[str, str] = {}
         for store in stores:
             for ns in store.namespaces:
+                if ns == "*":
+                    continue  # wildcard handled via default
                 self._ns_to_collection[ns] = store.name
+        # Ensure default store exists in the store list
+        store_names = {s.name for s in stores}
+        if default_store not in store_names:
+            self._default_store = stores[0].name if stores else "default"
 
     @property
     def store_names(self) -> list[str]:
@@ -72,11 +81,9 @@ class StoreRouter:
     def get_collection(self, namespace: str) -> str:
         """Return the collection name for a namespace.
 
-        Raises ValueError for unknown namespaces.
+        Unknown namespaces route to the default store.
         """
-        if namespace not in self._ns_to_collection:
-            raise ValueError(f"unknown namespace: {namespace!r}")
-        return self._ns_to_collection[namespace]
+        return self._ns_to_collection.get(namespace, self._default_store)
 
     def get_collections_for_namespaces(
         self, namespaces: list[str]

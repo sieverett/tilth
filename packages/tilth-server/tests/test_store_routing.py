@@ -88,10 +88,9 @@ class TestStoreRouter:
         assert router.get_collection("incidents") == "engineering"
         assert router.get_collection("hr") == "sensitive"
 
-    def test_unknown_namespace_raises(self) -> None:
+    def test_unknown_namespace_routes_to_default(self) -> None:
         router = self._make_router()
-        with pytest.raises(ValueError, match="unknown namespace"):
-            router.get_collection("nonexistent")
+        assert router.get_collection("nonexistent") == "default"
 
     def test_get_collections_for_namespaces_single_store(self) -> None:
         router = self._make_router()
@@ -273,12 +272,11 @@ class TestIngestRouting:
         assert router.get_collection("sales") == "default"
         assert router.get_collection("incidents") == "eng"
 
-    def test_ingest_unknown_namespace_raises(self) -> None:
+    def test_ingest_unknown_namespace_routes_to_default(self) -> None:
         router = StoreRouter([
             StoreConfig(name="default", namespaces=["sales"]),
         ])
-        with pytest.raises(ValueError):
-            router.get_collection("unknown")
+        assert router.get_collection("unknown") == "default"
 
 
 # --- Collection auto-creation ---

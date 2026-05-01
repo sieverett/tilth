@@ -31,11 +31,11 @@ def test_disallowed_metadata_keys_drop() -> None:
     assert metrics.get("tilth_dropped_total", {"reason": "invalid"}) == 1
 
 
-def test_text_over_32kb_drops() -> None:
-    """Text exceeding 32KB is dropped."""
+def test_text_over_256kb_drops() -> None:
+    """Text exceeding 256KB is dropped with warning."""
     from tilth import send
 
-    big_text = "x" * (32 * 1024 + 1)
+    big_text = "x" * (256 * 1024 + 1)
     send(big_text, namespace="ns")
 
     assert metrics.get("tilth_dropped_total", {"reason": "invalid"}) == 1

@@ -16,6 +16,7 @@ from tilth_server._shared.health import create_health_router
 from tilth_server._shared.policy import load_policy
 from tilth_server._shared.rate_limit import TokenBucket
 from tilth_server.ingest.batcher import BatchWriter
+from tilth_server.ingest.chunker import chunk_text
 from tilth_server.ingest.models import IngestRequest, IngestResponse
 from tilth_server.ingest.scrubber import scrub_text
 
@@ -33,7 +34,8 @@ def create_app(
     batch_size: int = 64,
     batch_window_ms: int = 200,
     batch_queue_max: int = 10_000,
-    max_text_bytes: int = 32768,
+    max_text_bytes: int = 256 * 1024,
+    chunk_size: int = 32 * 1024,
     skip_collection_check: bool = False,
     _capture_queue: list[dict[str, Any]] | None = None,
 ) -> FastAPI:
@@ -139,41 +141,59 @@ def create_app(
         # PII scrubbing
         scrubbed = scrub_text(body.text, analyzer=analyzer, anonymizer=anonymizer)
 
-        # Content hash
-        content_hash = hashlib.sha256(scrubbed.encode()).hexdigest()[:16]
+        # Chunk if needed
+        chunks = chunk_text(scrubbed, chunk_size=chunk_size)
 
-        # Build payload
-        request_id = str(uuid.uuid4())
-        payload: dict[str, Any] = {
-            "text": scrubbed,
-            "source": caller,  # from header, never from body
-            "namespace": body.namespace,
-            "ts": time.time(),
-            "content_hash": content_hash,
-            "request_id": request_id,
-            "client_ip": request.client.host if request.client else "",
-            "user_agent": request.headers.get("user-agent", ""),
-            **body.metadata,
-        }
+        if len(chunks) > 1:
+            log.info(
+                "Chunked %dKB text into %d records for namespace=%s",
+                len(scrubbed.encode("utf-8")) // 1024,
+                len(chunks),
+                body.namespace,
+            )
 
-        item = {
-            "id": request_id,
-            "text": scrubbed,
-            "payload": payload,
-        }
+        now = time.time()
+        client_ip = request.client.host if request.client else ""
+        user_agent_val = request.headers.get("user-agent", "")
 
-        # Testing hook
-        if _capture_queue is not None:
-            _capture_queue.append(item)
+        for chunk in chunks:
+            content_hash = hashlib.sha256(chunk.text.encode()).hexdigest()[:16]
+            request_id = str(uuid.uuid4())
 
-        # Submit to batch queue
-        try:
-            writer.submit_nowait(item)
-        except asyncio.QueueFull as exc:
-            raise HTTPException(
-                status_code=503,
-                detail="service overloaded, retry later",
-            ) from exc
+            payload: dict[str, Any] = {
+                "text": chunk.text,
+                "source": caller,
+                "namespace": body.namespace,
+                "ts": now,
+                "content_hash": content_hash,
+                "request_id": request_id,
+                "client_ip": client_ip,
+                "user_agent": user_agent_val,
+                **body.metadata,
+            }
+
+            # Add chunk metadata if text was split
+            if chunk.chunk_total > 1:
+                payload["chunk_group_id"] = chunk.chunk_group_id
+                payload["chunk_index"] = chunk.chunk_index
+                payload["chunk_total"] = chunk.chunk_total
+
+            item = {
+                "id": request_id,
+                "text": chunk.text,
+                "payload": payload,
+            }
+
+            if _capture_queue is not None:
+                _capture_queue.append(item)
+
+            try:
+                writer.submit_nowait(item)
+            except asyncio.QueueFull as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail="service overloaded, retry later",
+                ) from exc
 
         return IngestResponse()
 
