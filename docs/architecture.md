@@ -39,8 +39,9 @@ calling service.
 ### Ingest gateway (`tilth-server`, ingest)
 
 Receives writes from the client library. Authenticates the caller, scrubs
-PII, validates the namespace and metadata, batches embeddings, and upserts
-to Qdrant.
+PII, validates the namespace and metadata, chunks text >32KB at sentence
+boundaries, batches embeddings, and upserts to Qdrant. Supports multiple
+embedding providers via `EMBED_PROVIDER` (OpenAI, Azure).
 
 **Key property:** the gateway is the *only* service that holds a Qdrant
 write credential. The library has no credentials. Rotating Qdrant access
@@ -51,6 +52,7 @@ touches one service.
 Receives reads from MCP server, dashboards, and other tools. Enforces
 per-caller namespace ACLs server-side, caps result sizes, audits queries
 via structured logging, and wraps results in injection-resistant framing.
+Supports multiple embedding providers via `EMBED_PROVIDER` (OpenAI, Azure).
 
 **Key property:** the namespace filter is appended to every query
 unconditionally based on caller identity. A reader cannot bypass it by
@@ -64,6 +66,14 @@ verified caller identity from its transport-layer auth.
 
 **Key property:** the MCP server is a thin proxy. All policy lives in the
 query gateway. Adding new front doors doesn't require duplicating policy.
+
+### Reasoning agent (`tilth-agent`)
+
+A standalone Python package that runs a Claude/GPT tool-use loop. Reads
+from tilth via the query gateway, writes findings back via the ingest
+gateway. Maintains persistent memory across runs via a local file. Uses
+the tilth-server model abstraction (`_shared/models.py`) for LLM provider
+selection.
 
 ## Invariants
 
@@ -120,6 +130,9 @@ Each record stored in Qdrant has:
 | `trace_id` | client metadata | optional: correlation |
 | `subject_id` | client metadata | optional: customer/user/etc. |
 | `ttl_days` | client metadata | optional: retention hint |
+| `chunk_group_id` | gateway (when chunked) | linking chunks of split text |
+| `chunk_index` | gateway (when chunked) | linking chunks of split text |
+| `chunk_total` | gateway (when chunked) | linking chunks of split text |
 
 `source`, `ts`, `content_hash`, `request_id`, `client_ip`, and `user_agent`
 are immutable and gateway-set. Client-

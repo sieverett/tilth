@@ -41,6 +41,7 @@ Tilth ships as three independently installable PyPI packages:
 | `tilth` | `pip install tilth` | Client library. Fire-and-forget `tilth.send()`. |
 | `tilth-server` | `pip install tilth-server` | Ingest + query gateways. |
 | `tilth-mcp` | `pip install tilth-mcp` | MCP server for AI agents. |
+| `tilth-agent` | `pip install tilth-agent` | Reasoning agent for organizational analysis. |
 
 Most services only need `tilth`. The server and MCP packages are for
 operators running the infrastructure.
@@ -95,7 +96,7 @@ make e2e       # runs end-to-end tests
 
 ### `tilth.send(text, *, namespace, **metadata)`
 
-- `text` (str, required) — the content. Up to 32 KB.
+- `text` (str, required) — the content. Up to 256 KB (gateway chunks text >32KB at sentence boundaries).
 - `namespace` (str, required) — which namespace to write to. Your service is
   authorized for a fixed set; writing outside it is silently dropped.
 - `**metadata` — optional structured fields. Allowed keys: `env`, `severity`,
@@ -146,6 +147,7 @@ deterministic.
 | `TILTH_QUEUE_SIZE` | `10000` | Max in-memory buffer before drop. |
 | `TILTH_TIMEOUT_S` | `5.0` | Per-request HTTP timeout to the gateway. |
 | `TILTH_DISABLE` | unset | Set to `1` to no-op all `tilth.send()` calls. |
+| `EMBED_PROVIDER` | `openai` | Embedding provider (`openai` or `azure`). Azure support requires `AZURE_API_KEY`, `AZURE_API_BASE`, and `AZURE_API_VERSION`. |
 
 ---
 
@@ -156,6 +158,7 @@ service outage:
 
 - **Gateway unreachable** — records dropped, `tilth_dropped_total` incremented.
 - **Queue full** — records dropped, same metric.
+- **Oversized text** — records dropped with a WARNING log.
 - **Process exit** — best-effort flush via `atexit` (2-second timeout).
 
 If you need guaranteed delivery, you're using the wrong tool.
@@ -176,7 +179,7 @@ If you need guaranteed delivery, you're using the wrong tool.
 See [architecture.md](./docs/architecture.md) for the full system design.
 
 ```
-services ──tilth.send()──▶ ingest gateway ──▶ Qdrant ◀── query gateway ◀── MCP server ◀── agents
+services ──tilth.send()──▶ ingest gateway ──▶ Qdrant ◀── query gateway ◀── MCP server ◀── tilth-agent / agents
 ```
 
 Three services, one vector store, one client library. Credentials don't sprawl.

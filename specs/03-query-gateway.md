@@ -101,12 +101,13 @@ GET /metrics       → prometheus format
 |---|---|---|
 | `QDRANT_URL` | required | |
 | `QDRANT_API_KEY` | required | (separate creds from ingest gateway) |
-| `OPENAI_API_KEY` | required | |
+| `EMBED_PROVIDER` | `openai` | Embedding provider: `openai` or `azure`. When `azure`, requires `AZURE_API_KEY`, `AZURE_API_BASE`, `AZURE_API_VERSION`. When `openai`, requires `OPENAI_API_KEY`. |
 | `COLLECTION_NAME` | `tilth` | Must match ingest gateway. |
 | `EMBED_MODEL` | `text-embedding-3-small` | Must match ingest gateway. |
 | `MAX_TOP_K` | `20` | Hard cap on result count. |
 | `MAX_QUERY_BYTES` | `4096` | |
 | `READ_POLICY_PATH` | `/etc/tilth/read-policy.yaml` | |
+| `STORES_CONFIG_PATH` | `/etc/tilth/stores.yaml` | YAML file mapping namespaces to Qdrant collections via store_router. When caller's namespaces span multiple collections, the gateway fans out queries across stores. |
 
 ### Read policy file format
 
@@ -151,8 +152,9 @@ but the gateway supports all four for programmatic consumers.
 6. Build a Qdrant `Filter`:
    - `must`: `namespace IN effective`.
    - `must`: each filter key/value as `MatchValue`.
-7. Search Qdrant: `collection_name`, `query_vector`, `query_filter`,
-   `limit=body.top_k`, `with_payload=True`.
+7. Query Qdrant via `qdrant_client.query_points()`: `collection_name`,
+   `query=query_vector`, `query_filter`, `limit=body.top_k`,
+   `with_payload=True`.
 8. For each hit, build a result dict:
    ```python
    # Escape closing tags in text to prevent injection
@@ -170,6 +172,9 @@ but the gateway supports all four for programmatic consumers.
      "request_id": hit.payload.get("request_id"),
      "client_ip": hit.payload.get("client_ip"),
      "user_agent": hit.payload.get("user_agent"),
+     "chunk_group_id": hit.payload.get("chunk_group_id"),
+     "chunk_index": hit.payload.get("chunk_index"),
+     "chunk_total": hit.payload.get("chunk_total"),
      "content": (
        f'<retrieved_document source="{hit.payload["source"]}" '
        f'ts="{hit.payload["ts"]}">\n'

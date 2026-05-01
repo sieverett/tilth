@@ -18,7 +18,7 @@ x-workload-identity: <caller-id>    (header, set by client / mesh / proxy)
 
 Request body:
 {
-  "text": "string, 1..32768 bytes",
+  "text": "string, 1..262144 bytes",
   "namespace": "string",
   "metadata": {
     "env": "...",        // optional
@@ -60,15 +60,17 @@ GET /metrics
 |---|---|---|
 | `QDRANT_URL` | required | Qdrant base URL. |
 | `QDRANT_API_KEY` | required | Qdrant API key. |
-| `OPENAI_API_KEY` | required | For embedding API. |
+| `EMBED_PROVIDER` | `openai` | Embedding provider: `openai` or `azure`. When `azure`, requires `AZURE_API_KEY`, `AZURE_API_BASE`, `AZURE_API_VERSION`. When `openai`, requires `OPENAI_API_KEY`. |
 | `COLLECTION_NAME` | `tilth` | Qdrant collection. |
 | `EMBED_MODEL` | `text-embedding-3-small` | Must match query gateway. |
 | `EMBED_DIM` | `1536` | Vector dimension. |
 | `BATCH_SIZE` | `64` | Max records per embedding call. |
 | `BATCH_WINDOW_MS` | `200` | Max wait before flushing partial batch. |
 | `BATCH_QUEUE_MAX` | `10000` | Max items in the batch writer's internal queue. |
-| `MAX_TEXT_BYTES` | `32768` | Same limit as client. |
+| `MAX_TEXT_BYTES` | `262144` | Max text size (256KB). Gateway chunks text exceeding `CHUNK_SIZE_BYTES`. |
+| `CHUNK_SIZE_BYTES` | `32768` | Max size per chunk. Text larger than this is split at sentence boundaries. |
 | `WRITE_POLICY_PATH` | `/etc/tilth/write-policy.yaml` | YAML file mapping caller→namespaces. |
+| `STORES_CONFIG_PATH` | `/etc/tilth/stores.yaml` | YAML file mapping namespaces to Qdrant collections via store_router. |
 
 ### Write policy file format
 
@@ -115,9 +117,17 @@ with a clear error message. To reload policy, restart the service.
      "client_ip": request.client.host,
      "user_agent": request.headers.get("user-agent", ""),
      **body.metadata,
+     # When chunked, also includes:
+     # "chunk_group_id": uuid,
+     # "chunk_index": int,
+     # "chunk_total": int,
    }
    ```
-8. Submit to the batch writer's queue.
+8. If `len(scrubbed_text) > CHUNK_SIZE_BYTES`, split at sentence boundaries
+   into chunks. Each chunk gets a shared `chunk_group_id` (UUID4), a
+   `chunk_index` (0-based), and `chunk_total` (number of chunks). All
+   chunks share the same payload fields except text and chunk metadata.
+9. Submit to the batch writer's queue.
    - If queue is full → return 503 with `{"error": "service overloaded, retry later"}`.
 9. Return 202.
 
@@ -177,7 +187,7 @@ query gateway.
 - [ ] A test asserts a missing `x-workload-identity` header → 401.
 - [ ] A test asserts a caller writing outside their permitted namespaces → 403.
 - [ ] A test asserts a request with `metadata={"foo": "bar"}` (disallowed key) → 400.
-- [ ] A test asserts text >32KB → 400.
+- [ ] A test asserts text >256KB → 400.
 - [ ] A test asserts an email in `text` is replaced with a Presidio token
       before being passed to the batch writer.
 - [ ] A test asserts the request body's `source` field, if any, is ignored —

@@ -77,6 +77,42 @@ this to understand *why* without re-deriving it.
 **Why:** As an OSS project, docs referencing `#memory-platform` Slack and `internal.docs.your-org` URLs are confusing and useless.
 **Reversibility:** easy
 
+## 2026-04-30 — Provider abstraction for embeddings and LLM
+**Spec:** tilth-server _shared/models.py
+**Choice:** Thin wrapper over OpenAI, Azure OpenAI, and Anthropic. Swap via EMBED_PROVIDER and LLM_PROVIDER env vars.
+**Why:** Avoid dependency on LiteLLM (supply chain attack in March 2026). 20 lines of code vs a high-value dependency.
+**Reversibility:** easy
+
+## 2026-04-30 — Multi-store namespace routing
+**Spec:** tilth-server _shared/store_router.py
+**Choice:** Namespaces map to Qdrant collections via stores.yaml. Unknown namespaces route to a default store. Query gateway fans out across stores when caller's namespaces span multiple collections.
+**Why:** Physical separation of data domains without changing the client API. Operators configure topology; developers call tilth.send().
+**Reversibility:** medium
+
+## 2026-04-30 — Gateway-side text chunking
+**Spec:** tilth-server ingest/chunker.py
+**Choice:** Gateway splits text >32KB at sentence boundaries into linked chunks with chunk_group_id, chunk_index, chunk_total. Client limit raised from 32KB to 256KB.
+**Why:** Developer sends full text; gateway handles splitting. Chunking at sentence boundaries preserves semantic coherence per embedding.
+**Reversibility:** easy
+
+## 2026-04-30 — Client warns on oversized drops
+**Spec:** 01-client-library
+**Choice:** Client logs WARNING (was silent) when text exceeds 256KB and is dropped.
+**Why:** Silent drops are a debugging nightmare. The "never raise" contract is preserved — it's a log, not an exception.
+**Reversibility:** easy
+
+## 2026-04-30 — qdrant-client 1.17 API migration
+**Spec:** tilth-server query/app.py
+**Choice:** Use query_points() instead of search(). search() was removed in qdrant-client 1.17.
+**Why:** Dependency version requirement.
+**Reversibility:** n/a — forced by upstream
+
+## 2026-04-30 — tilth-agent reasoning package
+**Spec:** new package
+**Choice:** Standalone Python package with Claude/GPT tool-use loop. Reads from tilth, writes findings back. Persistent memory across runs via file. Uses tilth-server model abstraction for LLM provider.
+**Why:** Needed a reasoning agent without depending on OpenClaw (92+ CVEs, supply chain attacks in skill marketplace).
+**Reversibility:** easy — it's an independent package
+
 ---
 
 ## Blockers
