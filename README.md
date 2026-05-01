@@ -75,10 +75,58 @@ tilth.send("Customer requested refund for order #8821, cited shipping delay",
 `send()` is fire-and-forget. It returns immediately, queues the record in the
 background, and never raises into your code.
 
-### Reading (agents and tools)
+### Reading (agents and humans)
 
-Reads go through the query gateway or the MCP server. There is intentionally
-no read API in the client library. See [READING.md](./READING.md).
+Reads go through the MCP server. Ask your agent a question and it
+searches tilth automatically.
+
+#### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "tilth": {
+      "command": "python",
+      "args": ["-m", "tilth_mcp"],
+      "env": {
+        "TILTH_QUERY_GATEWAY_URL": "http://localhost:8002",
+        "TILTH_MCP_DEV_IDENTITY": "your-identity"
+      }
+    }
+  }
+}
+```
+
+Then ask Claude: *"What happened with payment failures last quarter?"*
+
+#### Claude Code
+
+Add to `.claude/settings.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "tilth": {
+      "command": "python",
+      "args": ["-m", "tilth_mcp"],
+      "env": {
+        "TILTH_QUERY_GATEWAY_URL": "http://localhost:8002",
+        "TILTH_MCP_DEV_IDENTITY": "your-identity"
+      }
+    }
+  }
+}
+```
+
+The `search_tilth` tool becomes available in your Claude Code session.
+
+#### Other MCP-aware agents
+
+Any agent host that supports MCP stdio servers (Cursor, Windsurf, custom
+frameworks) can connect the same way. See [READING.md](./READING.md) for
+the full tool interface and query gateway HTTP API.
 
 ### Running the stack locally
 
