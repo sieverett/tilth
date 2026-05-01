@@ -5,13 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yaml
-
 from tilth_server._shared.store_router import (
     StoreConfig,
     StoreRouter,
     load_store_config,
 )
-
 
 # --- Store config loading ---
 
