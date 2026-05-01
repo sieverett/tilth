@@ -75,3 +75,31 @@ METADATA_FIELDS: dict[str, str] = {
 }
 
 FILTERABLE_KEYS: list[str] = ["severity", "env", "subject_id", "trace_id"]
+
+
+class DeleteRequest(BaseModel):
+    """Request body for DELETE /records/{record_id}."""
+
+    reason: str = Field(min_length=1)
+
+
+class DeleteResponse(BaseModel):
+    """Response body for DELETE /records/{record_id}."""
+
+    status: str = "deleted"
+    record_id: str
+
+
+class UpdateRequest(BaseModel):
+    """Request body for PATCH /records/{record_id}."""
+
+    text: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
+class UpdateResponse(BaseModel):
+    """Response body for PATCH /records/{record_id}."""
+
+    status: str = "updated"
+    new_id: str
+    supersedes: str

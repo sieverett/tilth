@@ -120,6 +120,11 @@ Add to `.claude/settings.json` in your project:
 }
 ```
 
+For example:
+```json
+"TILTH_QUERY_GATEWAY_URL": "https://localhost:8001"
+```
+
 The `search_tilth` tool becomes available in your Claude Code session.
 
 #### Other MCP-aware agents
