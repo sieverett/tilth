@@ -91,7 +91,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "python",
       "args": ["-m", "tilth_mcp"],
       "env": {
-        "TILTH_QUERY_GATEWAY_URL": "http://localhost:8002",
+        "TILTH_QUERY_GATEWAY_URL": "https://your-tilth-query-host",
         "TILTH_MCP_DEV_IDENTITY": "your-identity"
       }
     }
@@ -112,7 +112,7 @@ Add to `.claude/settings.json` in your project:
       "command": "python",
       "args": ["-m", "tilth_mcp"],
       "env": {
-        "TILTH_QUERY_GATEWAY_URL": "http://localhost:8002",
+        "TILTH_QUERY_GATEWAY_URL": "https://your-tilth-query-host",
         "TILTH_MCP_DEV_IDENTITY": "your-identity"
       }
     }
