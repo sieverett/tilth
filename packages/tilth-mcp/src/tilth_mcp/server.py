@@ -250,90 +250,9 @@ async def search_tilth(
     )
 
 
-@mcp.tool(
-    name="delete_tilth_record",
-    description=(
-        "Delete a record from organizational memory by ID. This is a "
-        "destructive operation — the record is permanently removed. "
-        "Use only for takedowns (leaked secrets, PII that escaped "
-        "scrubbing, legal requests). Requires a reason. "
-        "IMPORTANT: Always confirm with the user before deleting."
-    ),
-)
-async def delete_tilth_record(
-    ctx: Context,  # type: ignore[type-arg]
-    record_id: str = Field(description="The ID of the record to delete."),
-    reason: str = Field(description="Why this record is being deleted."),
-) -> dict[str, str]:
-    """Delete a record from tilth memory."""
-    client: httpx.AsyncClient = ctx.request_context.lifespan_context["client"]
-    identity = resolve_identity()
-    headers = {"x-workload-identity": identity}
 
-    try:
-        resp = await client.request(
-            "DELETE",
-            f"{QUERY_GATEWAY_URL}/records/{record_id}",
-            json={"reason": reason},
-            headers=headers,
-        )
-    except httpx.RequestError as exc:
-        raise ToolError(
-            "memory service is temporarily unavailable"
-        ) from exc
-
-    if resp.status_code == 404:
-        raise ToolError(f"record {record_id} not found")
-    if resp.status_code == 401:
-        raise ToolError("memory service authentication failed")
-    if resp.status_code == 403:
-        raise PermissionError("not authorized to delete this record")
-    if resp.status_code >= 400:
-        raise ToolError("delete failed")
-
-    return resp.json()
-
-
-@mcp.tool(
-    name="update_tilth_record",
-    description=(
-        "Update a record in organizational memory. The old record is "
-        "preserved (soft-deleted) and a new record is created that "
-        "supersedes it. Use for correcting analysis, refining findings, "
-        "or fixing errors. Requires a reason. "
-        "IMPORTANT: Always confirm with the user before updating."
-    ),
-)
-async def update_tilth_record(
-    ctx: Context,  # type: ignore[type-arg]
-    record_id: str = Field(description="The ID of the record to update."),
-    text: str = Field(description="The new text content."),
-    reason: str = Field(description="Why this record is being updated."),
-) -> dict[str, str]:
-    """Update a record in tilth memory (soft delete + new record)."""
-    client: httpx.AsyncClient = ctx.request_context.lifespan_context["client"]
-    identity = resolve_identity()
-    headers = {"x-workload-identity": identity}
-
-    try:
-        resp = await client.request(
-            "PATCH",
-            f"{QUERY_GATEWAY_URL}/records/{record_id}",
-            json={"text": text, "reason": reason},
-            headers=headers,
-        )
-    except httpx.RequestError as exc:
-        raise ToolError(
-            "memory service is temporarily unavailable"
-        ) from exc
-
-    if resp.status_code == 404:
-        raise ToolError(f"record {record_id} not found")
-    if resp.status_code == 401:
-        raise ToolError("memory service authentication failed")
-    if resp.status_code == 403:
-        raise PermissionError("not authorized to update this record")
-    if resp.status_code >= 400:
-        raise ToolError("update failed")
-
-    return resp.json()
+# NOTE: delete and update operations are intentionally NOT exposed via MCP.
+# Agents should not have direct mutation access to organizational memory.
+# Delete and update are admin operations available only through the
+# gateway HTTP API with admin-level authentication (JWT with admin role
+# in production, or direct gateway access in dev mode).

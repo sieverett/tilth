@@ -11,7 +11,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 
-from tilth_server._shared.auth import extract_caller_identity
+from tilth_server._shared.auth import (
+    AuthMode,
+    JWTAuthenticator,
+    extract_caller_identity,
+    require_admin,
+)
 from tilth_server._shared.health import create_health_router
 from tilth_server._shared.policy import load_policy
 from tilth_server._shared.rate_limit import TokenBucket
@@ -41,6 +46,8 @@ def create_app(
     collection_name: str = "tilth",
     store_router: Any | None = None,
     write_policy_path: str | None = None,
+    auth_mode: AuthMode = AuthMode.DEV,
+    jwt_authenticator: JWTAuthenticator | None = None,
     max_top_k: int = 20,
     max_query_bytes: int = 4096,
 ) -> FastAPI:
@@ -65,6 +72,24 @@ def create_app(
 
     rate_limiter = TokenBucket(rate=30.0, burst=60)
 
+    def _authenticate(request: Request) -> str:
+        """Authenticate the caller based on auth mode."""
+        return extract_caller_identity(
+            header_value=request.headers.get("x-workload-identity"),
+            known_callers=known_callers,
+            mode=auth_mode,
+            jwt_authenticator=jwt_authenticator,
+            authorization_header=request.headers.get("authorization"),
+        )
+
+    def _require_admin(request: Request) -> None:
+        """Require admin role for mutation operations."""
+        require_admin(
+            jwt_authenticator=jwt_authenticator,
+            authorization_header=request.headers.get("authorization"),
+            mode=auth_mode,
+        )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         yield
@@ -77,8 +102,7 @@ def create_app(
     @app.post("/query", response_model=QueryResponse)
     async def query(request: Request, body: QueryRequest) -> QueryResponse:
         # Auth
-        header_value = request.headers.get("x-workload-identity")
-        caller = extract_caller_identity(header_value, known_callers)
+        caller = _authenticate(request)
 
         # Rate limit
         if not rate_limiter.consume(caller):
@@ -176,8 +200,7 @@ def create_app(
     @app.get("/schema", response_model=SchemaResponse)
     async def schema(request: Request) -> SchemaResponse:
         """Return the data model, with namespaces scoped to the caller."""
-        header_value = request.headers.get("x-workload-identity")
-        caller = extract_caller_identity(header_value, known_callers)
+        caller = _authenticate(request)
         caller_namespaces = sorted(policy.get(caller, set()))
 
         return SchemaResponse(
@@ -213,9 +236,9 @@ def create_app(
     async def delete_record(
         request: Request, record_id: str, body: DeleteRequest
     ) -> DeleteResponse:
-        """Hard delete a record. Audit logged."""
-        header_value = request.headers.get("x-workload-identity")
-        caller = extract_caller_identity(header_value, known_callers)
+        """Hard delete a record. Audit logged. Requires admin in prod."""
+        _require_admin(request)
+        caller = _authenticate(request)
 
         record = await _get_record(record_id)
         if record is None:
@@ -255,9 +278,9 @@ def create_app(
     async def update_record(
         request: Request, record_id: str, body: UpdateRequest
     ) -> UpdateResponse:
-        """Soft-delete old record, create new one that supersedes it."""
-        header_value = request.headers.get("x-workload-identity")
-        caller = extract_caller_identity(header_value, known_callers)
+        """Soft-delete old record, create new one. Requires admin in prod."""
+        _require_admin(request)
+        caller = _authenticate(request)
 
         record = await _get_record(record_id)
         if record is None:

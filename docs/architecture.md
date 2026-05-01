@@ -54,15 +54,23 @@ per-caller namespace ACLs server-side, caps result sizes, audits queries
 via structured logging, and wraps results in injection-resistant framing.
 Supports multiple embedding providers via `EMBED_PROVIDER` (OpenAI, Azure).
 
+In prod mode (`TILTH_AUTH_MODE=prod`), caller identity is derived from a
+validated JWT (`Authorization: Bearer` header) rather than the
+`x-workload-identity` header. Mutation endpoints (`DELETE /records/{id}`,
+`PATCH /records/{id}`) require the `admin` role in the JWT claims.
+
 **Key property:** the namespace filter is appended to every query
 unconditionally based on caller identity. A reader cannot bypass it by
 passing parameters.
 
 ### MCP server (`tilth-mcp`)
 
-Exposes a single tool `search_tilth` to MCP-aware agents. Translates
-MCP tool calls into HTTP requests against the query gateway. Forwards the
-verified caller identity from its transport-layer auth.
+Exposes `search_tilth` to MCP-aware agents. Translates MCP tool calls
+into HTTP requests against the query gateway. Forwards the verified caller
+identity from its transport-layer auth. The MCP server is read/write
+only — `delete_tilth_record` and `update_tilth_record` tools have been
+removed. Agents that need to delete or update records must go through the
+gateway API with admin credentials.
 
 **Key property:** the MCP server is a thin proxy. All policy lives in the
 query gateway. Adding new front doors doesn't require duplicating policy.
@@ -81,9 +89,11 @@ These must hold across all components. If you find yourself building
 something that breaks one, stop and re-read the threat model.
 
 1. **Caller identity is set server-side, never trusted from the client.**
-   The library sends `x-workload-identity` from `TILTH_IDENTITY`, but the
-   gateway treats it as a claim validated against the policy table. The MCP
-   server forwards the verified transport identity, not agent arguments.
+   In dev mode, the library sends `x-workload-identity` from
+   `TILTH_IDENTITY`, and the gateway treats it as a claim validated against
+   the policy table. In prod mode, identity is derived from a validated JWT
+   subject claim. The MCP server forwards the verified transport identity,
+   not agent arguments.
 
 2. **Namespace ACLs are enforced server-side.** Both gateways have a policy
    table mapping caller to permitted namespaces. Requests are intersected
@@ -162,8 +172,8 @@ that natural — read access is granted only where genuinely needed.
 
 ## What's deliberately not here (v1)
 
-- A real auth integration. v1 trusts a transport header; production needs
-  mesh mTLS or OAuth.
+- ~~A real auth integration. v1 trusts a transport header; production needs
+  mesh mTLS or OAuth.~~ JWT auth is now available via `TILTH_AUTH_MODE=prod`.
 - A reranker. Vector search alone returns acceptable but not great results.
 - TTL enforcement. Records live forever until explicitly deleted.
 - A `delete_by_subject` admin endpoint for right-to-erasure.

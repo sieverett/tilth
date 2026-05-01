@@ -93,6 +93,10 @@ tilth/
 - `ruff` for lint + format. `mypy --strict` for types.
 - `pytest` with `pytest-asyncio`. `respx` for HTTP mocking.
 - `qdrant-client` 1.17+ — uses `query_points()`, not `search()`.
+- Auth mode: set `TILTH_AUTH_MODE=dev` (default, trusts `x-workload-identity`
+  header) or `TILTH_AUTH_MODE=prod` (validates JWT from `Authorization:
+  Bearer` header). In prod mode, `TILTH_JWT_SECRET` and optionally
+  `TILTH_JWT_ALGORITHM` are required. See `.env.example`.
 
 Don't add dependencies without a reason. Log additions in `DECISIONS.md`.
 

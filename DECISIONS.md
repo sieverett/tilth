@@ -113,6 +113,18 @@ this to understand *why* without re-deriving it.
 **Why:** Needed a reasoning agent without depending on OpenClaw (92+ CVEs, supply chain attacks in skill marketplace).
 **Reversibility:** easy — it's an independent package
 
+## 2026-04-29 — JWT auth with dev/prod flag
+**Spec:** 03-query-gateway.md, threat-model.md
+**Choice:** `TILTH_AUTH_MODE` env var switches between `dev` (trust `x-workload-identity` header) and `prod` (validate JWT from `Authorization: Bearer` header). In prod mode, `TILTH_JWT_SECRET` and `TILTH_JWT_ALGORITHM` (default HS256) are required. JWT subject claim becomes the caller identity; JWT roles claim gates admin access.
+**Why:** v1 header-trust auth was a known gap. JWT support closes it for production deployments without breaking the dev workflow. The flag avoids forcing JWT setup in local/CI environments.
+**Reversibility:** easy — the dev mode path is unchanged
+
+## 2026-04-29 — Remove delete/update from MCP server
+**Spec:** 04-mcp-server.md
+**Choice:** `delete_tilth_record` and `update_tilth_record` tools removed from the MCP server. Agents are read/write only. Mutations go through the gateway API with admin credentials.
+**Why:** Agents should not have the ability to delete or modify records. This reduces the blast radius of prompt injection and compromised agent sessions. Admin operations belong behind authenticated gateway endpoints, not in agent tool sets.
+**Reversibility:** easy — re-adding tools is mechanical
+
 ---
 
 ## Blockers
