@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -19,10 +20,14 @@ from tilth_server.query.models import (
     FILTERABLE_KEYS,
     METADATA_FIELDS,
     RECORD_FIELDS,
+    DeleteRequest,
+    DeleteResponse,
     QueryRequest,
     QueryResponse,
     QueryResult,
     SchemaResponse,
+    UpdateRequest,
+    UpdateResponse,
 )
 
 log = logging.getLogger("tilth.query")
@@ -35,6 +40,7 @@ def create_app(
     embedding_client: Any,
     collection_name: str = "tilth",
     store_router: Any | None = None,
+    write_policy_path: str | None = None,
     max_top_k: int = 20,
     max_query_bytes: int = 4096,
 ) -> FastAPI:
@@ -50,6 +56,12 @@ def create_app(
     """
     policy = load_policy(policy_path)
     known_callers = set(policy.keys())
+
+    # Write policy for mutations (delete/update)
+    write_policy: dict[str, set[str]] = {}
+    if write_policy_path:
+        write_policy = load_policy(write_policy_path)
+        known_callers |= set(write_policy.keys())
 
     rate_limiter = TokenBucket(rate=30.0, burst=60)
 
@@ -174,6 +186,147 @@ def create_app(
             metadata_fields=METADATA_FIELDS,
             filterable_keys=FILTERABLE_KEYS,
             embed_model=embedding_client.model_name,
+        )
+
+    async def _get_record(record_id: str) -> Any:
+        """Retrieve a record by ID. Returns None if not found."""
+        results = await qdrant_client.retrieve(
+            collection_name=collection_name,
+            ids=[record_id],
+            with_payload=True,
+            with_vectors=False,
+        )
+        return results[0] if results else None
+
+    def _check_write_access(caller: str, namespace: str) -> None:
+        """Check caller has write access to the namespace."""
+        allowed = write_policy.get(caller, set())
+        if namespace not in allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"{caller} cannot modify records in {namespace}",
+            )
+
+    @app.delete(
+        "/records/{record_id}", response_model=DeleteResponse
+    )
+    async def delete_record(
+        request: Request, record_id: str, body: DeleteRequest
+    ) -> DeleteResponse:
+        """Hard delete a record. Audit logged."""
+        header_value = request.headers.get("x-workload-identity")
+        caller = extract_caller_identity(header_value, known_callers)
+
+        record = await _get_record(record_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="record not found")
+
+        namespace = record.payload.get("namespace", "")
+        _check_write_access(caller, namespace)
+
+        # Audit log before deletion
+        audit_log.info(
+            json.dumps(
+                {
+                    "event": "delete",
+                    "ts": time.time(),
+                    "caller": caller,
+                    "record_id": record_id,
+                    "namespace": namespace,
+                    "source": record.payload.get("source"),
+                    "content_hash": record.payload.get("content_hash"),
+                    "reason": body.reason,
+                }
+            )
+        )
+
+        from qdrant_client.models import PointIdsList
+
+        await qdrant_client.delete(
+            collection_name=collection_name,
+            points_selector=PointIdsList(points=[record_id]),
+        )
+
+        return DeleteResponse(record_id=record_id)
+
+    @app.patch(
+        "/records/{record_id}", response_model=UpdateResponse
+    )
+    async def update_record(
+        request: Request, record_id: str, body: UpdateRequest
+    ) -> UpdateResponse:
+        """Soft-delete old record, create new one that supersedes it."""
+        header_value = request.headers.get("x-workload-identity")
+        caller = extract_caller_identity(header_value, known_callers)
+
+        record = await _get_record(record_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="record not found")
+
+        namespace = record.payload.get("namespace", "")
+        _check_write_access(caller, namespace)
+
+        # Embed new text
+        vectors = await embedding_client.embed([body.text])
+
+        # Build new record
+        new_id = str(uuid.uuid4())
+        new_content_hash = hashlib.sha256(
+            body.text.encode()
+        ).hexdigest()[:16]
+
+        new_payload = {
+            **record.payload,
+            "text": body.text,
+            "content_hash": new_content_hash,
+            "request_id": new_id,
+            "ts": time.time(),
+            "supersedes": record_id,
+        }
+
+        # Mark old record as superseded
+        old_payload = dict(record.payload)
+        old_payload["superseded_by"] = new_id
+
+        from qdrant_client.models import PointStruct
+
+        # Upsert both: updated old record + new record
+        await qdrant_client.upsert(
+            collection_name=collection_name,
+            points=[
+                PointStruct(
+                    id=record_id,
+                    vector=record.vector or vectors[0],
+                    payload=old_payload,
+                ),
+                PointStruct(
+                    id=new_id,
+                    vector=vectors[0],
+                    payload=new_payload,
+                ),
+            ],
+        )
+
+        previous_hash = record.payload.get("content_hash", "")
+        audit_log.info(
+            json.dumps(
+                {
+                    "event": "update",
+                    "ts": time.time(),
+                    "caller": caller,
+                    "record_id": record_id,
+                    "new_id": new_id,
+                    "namespace": namespace,
+                    "previous_content_hash": previous_hash,
+                    "new_content_hash": new_content_hash,
+                    "reason": body.reason,
+                }
+            )
+        )
+
+        return UpdateResponse(
+            new_id=new_id,
+            supersedes=record_id,
         )
 
     return app
