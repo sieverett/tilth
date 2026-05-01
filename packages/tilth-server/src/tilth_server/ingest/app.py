@@ -29,6 +29,7 @@ def create_app(
     analyzer: Any,
     anonymizer: Any,
     collection_name: str = "tilth",
+    store_router: Any | None = None,
     batch_size: int = 64,
     batch_window_ms: int = 200,
     batch_queue_max: int = 10_000,
@@ -58,10 +59,13 @@ def create_app(
 
     rate_limiter = TokenBucket(rate=100.0, burst=200)
 
+    resolve_fn = store_router.get_collection if store_router else None
+
     writer = BatchWriter(
         qdrant=qdrant_client,
         embedding_client=embedding_client,
         collection_name=collection_name,
+        resolve_collection=resolve_fn,
         batch_size=batch_size,
         batch_window_ms=batch_window_ms,
         queue_max=batch_queue_max,
@@ -69,24 +73,30 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-        # Create collection if it doesn't exist
+        # Create collections
         if not skip_collection_check:
             try:
-                from qdrant_client.models import Distance, VectorParams
+                if store_router:
+                    await store_router.ensure_collections(
+                        qdrant_client=qdrant_client,
+                        dimension=embedding_client.dimension,
+                    )
+                else:
+                    from qdrant_client.models import Distance, VectorParams
 
-                if not await qdrant_client.collection_exists(collection_name):
-                    await qdrant_client.create_collection(
-                        collection_name=collection_name,
-                        vectors_config=VectorParams(
-                            size=embedding_client.dimension,
-                            distance=Distance.COSINE,
-                        ),
-                    )
-                    log.info(
-                        "Created Qdrant collection %s (dim=%d)",
-                        collection_name,
-                        embedding_client.dimension,
-                    )
+                    if not await qdrant_client.collection_exists(collection_name):
+                        await qdrant_client.create_collection(
+                            collection_name=collection_name,
+                            vectors_config=VectorParams(
+                                size=embedding_client.dimension,
+                                distance=Distance.COSINE,
+                            ),
+                        )
+                        log.info(
+                            "Created Qdrant collection %s (dim=%d)",
+                            collection_name,
+                            embedding_client.dimension,
+                        )
             except Exception:
                 log.exception("Failed to initialize Qdrant collection")
 

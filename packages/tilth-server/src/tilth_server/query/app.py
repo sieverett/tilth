@@ -34,6 +34,7 @@ def create_app(
     qdrant_client: Any,
     embedding_client: Any,
     collection_name: str = "tilth",
+    store_router: Any | None = None,
     max_top_k: int = 20,
     max_query_bytes: int = 4096,
 ) -> FastAPI:
@@ -92,15 +93,29 @@ def create_app(
         vectors = await embedding_client.embed([body.query])
         query_vector = vectors[0]
 
-        # Search Qdrant
-        search_result = await qdrant_client.query_points(
-            collection_name=collection_name,
-            query=query_vector,
-            query_filter=qfilter,
-            limit=body.top_k,
-            with_payload=True,
-        )
-        hits = search_result.points
+        # Search Qdrant — fan out if namespaces span multiple stores
+        if store_router and store_router.needs_fanout(effective):
+            hits = await store_router.fan_out_query(
+                qdrant_client=qdrant_client,
+                query_vector=query_vector,
+                namespaces=effective,
+                query_filter=qfilter,
+                top_k=body.top_k,
+            )
+        else:
+            target_collection = (
+                store_router.get_collection(effective[0])
+                if store_router
+                else collection_name
+            )
+            search_result = await qdrant_client.query_points(
+                collection_name=target_collection,
+                query=query_vector,
+                query_filter=qfilter,
+                limit=body.top_k,
+                with_payload=True,
+            )
+            hits = search_result.points
 
         # Build results
         results: list[QueryResult] = []
