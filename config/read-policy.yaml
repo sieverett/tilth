@@ -5,6 +5,7 @@ ops-copilot:
   - sales
   - analysis
   - agent-tasks
+  - web
 support-agent:
   - support
   - billing

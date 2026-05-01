@@ -8,6 +8,8 @@ test-writer:
 ops-copilot:
   - analysis
   - agent-tasks
+browser-capture:
+  - web
 checkout-svc:
   - checkout
 support-bot:
