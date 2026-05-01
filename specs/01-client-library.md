@@ -48,7 +48,8 @@ increment. This matches the gateway's allowlist exactly.
 
 ### Constraints
 
-- `text` max 32 KB after UTF-8 encoding.
+- `text` max 256 KB after UTF-8 encoding.
+- Oversized text is dropped with a WARNING log.
 - Empty `text` or empty `namespace` → drop, increment `tilth_dropped_total{reason="invalid"}`.
 - Anything outside the allowed metadata keys → drop, same reason.
 
@@ -125,7 +126,7 @@ Yields the list. Restores on exit. The worker thread is never started.
       ~19,900 of them with `tilth_dropped_total{reason="queue_full"}` incremented.
 - [ ] A test asserts disallowed metadata keys cause a drop with
       `reason="invalid"`.
-- [ ] A test asserts text >32KB is dropped with `reason="invalid"`.
+- [ ] A test asserts text >256KB is dropped with `reason="invalid"`.
 - [ ] A test asserts `TILTH_DISABLE=1` causes all sends to drop with
       `reason="disabled"` and the worker thread is never started.
 - [ ] A test asserts `recording()` captures sends in-process without

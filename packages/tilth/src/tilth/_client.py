@@ -20,7 +20,7 @@ log = logging.getLogger("tilth")
 ALLOWED_METADATA_KEYS = frozenset(
     {"env", "severity", "trace_id", "subject_id", "ttl_days"}
 )
-MAX_TEXT_BYTES = 32 * 1024
+MAX_TEXT_BYTES = 256 * 1024  # 256KB — gateway handles chunking
 
 _SENTINEL = object()
 
@@ -124,8 +124,14 @@ def send(text: str, *, namespace: str, **metadata: Any) -> None:
             metrics.inc("tilth_dropped_total", {"reason": "invalid"})
             return
 
-        if len(text.encode("utf-8")) > MAX_TEXT_BYTES:
+        text_bytes = len(text.encode("utf-8"))
+        if text_bytes > MAX_TEXT_BYTES:
             metrics.inc("tilth_dropped_total", {"reason": "invalid"})
+            log.warning(
+                "tilth: text too large (%dKB > %dKB limit), dropping",
+                text_bytes // 1024,
+                MAX_TEXT_BYTES // 1024,
+            )
             return
 
         bad_keys = set(metadata.keys()) - ALLOWED_METADATA_KEYS

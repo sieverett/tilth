@@ -36,7 +36,8 @@ class BatchWriter:
         self,
         qdrant: Any,
         embedding_client: Any,
-        collection_name: str,
+        collection_name: str = "tilth",
+        resolve_collection: Any | None = None,
         batch_size: int = 64,
         batch_window_ms: int = 200,
         queue_max: int = 10_000,
@@ -45,6 +46,7 @@ class BatchWriter:
         self.qdrant = qdrant
         self.embedding_client = embedding_client
         self.collection_name = collection_name
+        self._resolve_collection = resolve_collection
         self.batch_size = batch_size
         self.batch_window_ms = batch_window_ms
         self._task: asyncio.Task[None] | None = None
@@ -109,6 +111,13 @@ class BatchWriter:
                     log.exception("flush failed during shutdown drain")
                     FLUSH_FAILED.inc()
 
+    def _get_collection(self, item: dict[str, Any]) -> str:
+        """Resolve collection name for an item."""
+        if self._resolve_collection is not None:
+            namespace = item.get("payload", {}).get("namespace", "")
+            return self._resolve_collection(namespace)
+        return self.collection_name
+
     async def _flush(self, batch: list[dict[str, Any]]) -> None:
         """Embed and upsert a batch of items."""
         BATCH_SIZE_HIST.observe(len(batch))
@@ -119,17 +128,21 @@ class BatchWriter:
         vectors = await self.embedding_client.embed(texts)
         EMBED_LATENCY.observe(time.monotonic() - start)
 
-        points = [
-            PointStruct(
+        # Group points by collection
+        by_collection: dict[str, list[PointStruct]] = {}
+        for item, vec in zip(batch, vectors, strict=True):
+            collection = self._get_collection(item)
+            point = PointStruct(
                 id=item["id"],
                 vector=vec,
                 payload=item["payload"],
             )
-            for item, vec in zip(batch, vectors, strict=True)
-        ]
+            by_collection.setdefault(collection, []).append(point)
 
+        # Upsert to each collection
         start = time.monotonic()
-        await self.qdrant.upsert(
-            collection_name=self.collection_name, points=points
-        )
+        for collection, points in by_collection.items():
+            await self.qdrant.upsert(
+                collection_name=collection, points=points
+            )
         UPSERT_LATENCY.observe(time.monotonic() - start)

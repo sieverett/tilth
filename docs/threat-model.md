@@ -100,7 +100,7 @@ Rate limiting caps requests but not embedding tokens.
 
 **Mitigation:**
 - Per-caller rate limits on the ingest gateway cap request volume.
-- Text size limit (32KB) bounds per-request token cost.
+- Text size limit (256KB, chunked into 32KB segments) bounds per-request token cost. Note that a single request can generate up to ~8 embedding calls.
 - Batching amortizes per-call overhead but doesn't reduce total tokens.
 
 **Residual risk:** A sustained flood at rate-limit capacity still generates

@@ -89,7 +89,7 @@ async def client(
         batch_size=64,
         batch_window_ms=200,
         batch_queue_max=10_000,
-        max_text_bytes=32768,
+        max_text_bytes=256 * 1024,
         skip_collection_check=True,
     )
     async with AsyncClient(
@@ -146,16 +146,16 @@ class TestIngestValidation:
         )
         assert resp.status_code == 422  # pydantic validation error
 
-    async def test_text_over_32kb_returns_400(
+    async def test_text_over_256kb_returns_422(
         self, client: AsyncClient
     ) -> None:
-        big_text = "x" * 32769
+        big_text = "x" * (256 * 1024 + 1)
         resp = await client.post(
             "/ingest",
             json={"text": big_text, "namespace": "checkout"},
             headers={"x-workload-identity": "checkout-svc"},
         )
-        assert resp.status_code == 422  # pydantic validation error
+        assert resp.status_code == 422
 
 
 class TestIngestBehavior:
